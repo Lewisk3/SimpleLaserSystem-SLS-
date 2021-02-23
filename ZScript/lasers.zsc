@@ -1,0 +1,60 @@
+class RedLaser_Decal : LaserDecal
+{
+	Default
+	{
+		RenderStyle "Add";
+		LaserDecal.DecalOnActors true;
+		Alpha 0.7;
+	}
+	States
+	{
+		Spawn:
+			LASH A 1 Bright 
+			{
+				A_FadeOut(0.002);
+				if(random(1,60)==60) 
+				{
+					LaserGlobals.SpawnFX(self, "LaserSmoke", frandom(-10,10), -90 + frandom(0,30), frandom(-10,10), -16);
+				}
+			}
+		wait;
+	}
+}
+
+class RedLaser : Laser
+{
+	Default
+	{
+		Scale 0.8;
+		RenderStyle "Add";
+		Translation "0:255=@80[128,0,0]";
+		Alpha 1.0;
+	}
+	States
+	{
+		Spawn:
+			BEAM A 1;
+		loop;
+	}	
+}
+
+class RedLaser_Puff : LaserPuff
+{
+	Default
+	{
+		RenderStyle "Add";
+	}
+	States
+	{
+		Spawn:
+			TNT1 A 1 NoDelay
+			{
+				DoSmoke(3);
+				DoDecal("RedLaser_Decal");
+				DoParticles(spd:frandom(2,5));
+				DamageHitActor(2);
+				// A_StartSound("Laser/Impact", flags:CHANF_OVERLAP);
+			}
+		stop;
+	}
+}

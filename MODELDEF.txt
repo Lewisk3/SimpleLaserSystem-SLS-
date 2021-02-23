@@ -1,4 +1,4 @@
-Model Lazor
+Model RedLaser
 {
 	Path "models"
 	Model 0 "beam.md3"

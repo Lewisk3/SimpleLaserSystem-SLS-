@@ -1,16 +1,19 @@
 material texture models/BEAM.png {
-	brightmap BEAM.png
+	brightmap models/BEAM.png
 }
 
-pointlight BlueBrightLight
-{
-    color 0.0 0.0 1.0
-    size 8
+material texture sprites/LASHA0.png {
+	brightmap sprites/LASHA0.png
 }
 
-/*
-object Lazor
+pointlight RedBrightLight
 {
-	Frame BEAM { light BlueBrightLight }
+    color 1.0 0.0 0.0
+    size 12
 }
-*/
+
+
+object RedLaser_Decal
+{
+	Frame LASH { light RedBrightLight }
+}

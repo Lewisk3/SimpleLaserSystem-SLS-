@@ -1,0 +1,171 @@
+// Globals
+class LaserGlobals abstract
+{
+	static play Actor SpawnFX(Actor src, class<Actor> type, double xyoffs, double poffs, double zoffs, double dist=16)
+	{
+		vector3 spos = src.Vec3Offset(cos(src.angle+xyoffs)*dist, sin(src.angle+xyoffs)*dist, zoffs);
+		let proj = Actor.Spawn(type, spos);
+		if(proj)
+		{
+			proj.target = src; // Assign target to shooter.
+			proj.angle = src.angle+xyoffs;
+			proj.pitch = src.pitch+poffs;
+			proj.vel = (
+				cos(proj.angle)*cos(proj.pitch),
+				sin(proj.angle)*cos(proj.pitch),
+				-sin(proj.pitch)
+			) * proj.default.speed;
+		}
+		return proj;
+	}
+	
+	// Linear interpolate
+	static double Lerp(double a, double b, double lerpFactor)
+	{
+		double result = (a * (1.f - lerpFactor)) + (b * lerpFactor);
+		return result;
+	}
+}
+
+
+// Laser Emitter
+class LaserEmitter : Actor
+{
+	Actor source;
+	Actor aimactor;
+	Laser activelaser;
+	vector3 aimpos;
+	vector2 viewoffs, pview, viewvel;
+	vector3 posoffs;
+	bool laser_on;
+	double curdist;
+	
+	Default
+	{
+		+NOINTERACTION;
+		+INTERPOLATEANGLES;
+	}
+	
+	private double GetDist(uint flags, int maxdist = int.max)
+	{
+		FLineTraceData lt;
+		if(!laser_on || !activelaser)
+			LineTrace(angle, maxdist, pitch, flags,0, source.radius+16,0, lt);
+		else
+			LineTrace(activelaser.angle, maxdist, activelaser.pitch-90, flags,0, source.radius+16,0, lt);
+		aimpos = lt.HitLocation;
+		aimactor = lt.HitActor;
+		return lt.Distance;
+	}
+
+	override void Tick()
+	{
+		if(!source) return;
+		viewvel = (source.angle - pview.x, source.pitch - pview.y);
+		A_SetAngle(source.angle + viewoffs.x, SPF_INTERPOLATE);
+		A_SetPitch(source.pitch + viewoffs.y, SPF_INTERPOLATE);
+		pview = (source.angle, source.pitch);
+		super.Tick();
+	}
+	
+	void SetPos(Vector3 pos, vector3 pos_offset = (0,0,0), vector2 view_offset = (0,0))
+	{
+		viewoffs = view_offset;
+		posoffs = pos_offset;
+		SetOrigin(level.Vec3Offset(pos,pos_offset), false);
+	}
+	
+	static LaserEmitter Attach(Actor to)
+	{
+		let lasersource = LaserEmitter(Spawn("LaserEmitter"));
+		if(lasersource) 
+		{
+			lasersource.source = to;
+			lasersource.SetPos(to.pos);
+		}
+		return lasersource;
+	}
+
+	Laser Fire(class<Laser> parts, class<Actor> puff = "", int maxdist = int.max, uint ltflags = 0, bool predict = false)
+	{
+		if(!source) return null;
+		curdist = GetDist(ltflags, maxdist);	
+		vel = source.vel;
+		Actor spwnpuff;
+		if(puff)
+		{
+			spwnpuff = Spawn(puff, aimpos);
+			if(spwnpuff) 
+			{
+				spwnpuff.angle = angle;
+				spwnpuff.pitch = pitch;
+			}
+		}
+		if(!laser_on)
+		{
+			let lasobj = Laser(Actor.Spawn(parts,pos));
+			if(lasobj) 
+			{
+				lasobj.emitter = self;
+				lasobj.angle = angle;
+				lasobj.pitch = pitch+90;
+				lasobj.aimpuff = spwnpuff;
+				lasobj.predictaim = predict;
+			}
+			activelaser = lasobj;
+		}
+		if(spwnpuff) spwnpuff.target = activelaser;
+		laser_on = true;
+		return activelaser;
+	}
+	
+	void LaserOff()
+	{
+		laser_on = false;
+	}
+}
+
+// Laser Object
+class Laser : Actor
+{
+	LaserEmitter emitter;
+	Actor aimpuff;
+	double dist;
+	bool predictaim;
+	
+	Default
+	{	
+		+NOINTERACTION;
+		+INTERPOLATEANGLES;
+		Radius 6;
+	}
+
+	override void Tick() 
+	{
+		if(!emitter || !emitter.laser_on) 
+		{
+			Destroy();
+			return;
+		}
+		// Carefully follow emitter.
+		vector2 paim = (0,0);
+		if(predictaim) paim = emitter.viewvel;
+		A_SetAngle(LaserGlobals.Lerp(angle, emitter.angle + paim.x, 0.5), SPF_INTERPOLATE);
+		A_SetPitch(LaserGlobals.Lerp(pitch, emitter.pitch+90 + paim.y, 0.5), SPF_INTERPOLATE);
+		
+		vector3 posdir = (
+			cos(angle) * cos(pitch-90),
+			sin(angle) * cos(pitch-90),
+			sin(pitch+90)
+		) * emitter.curdist/2.;
+		
+		// Scale to correct size.
+		double newscale = default.scale.x * (emitter.curdist / (radius*default.scale.x));
+		Scale.Y = newscale < Scale.Y ? LaserGlobals.Lerp(Scale.Y, newscale, 0.1) : newscale;
+		
+		// Warp to emitter.
+		posdir = level.Vec3Offset(posdir, emitter.pos);		
+		vector3 finalpos = level.Vec3Offset(posdir, vel);
+		SetOrigin(finalpos, true);
+	}
+}
