@@ -1,0 +1,14 @@
+material texture models/BEAM.png {
+	brightmap BEAM.png
+}
+
+pointlight BlueBrightLight
+{
+    color 0.0 0.0 1.0
+    size 8
+}
+
+object Lazor
+{
+	Frame BEAM { light BlueBrightLight }
+}

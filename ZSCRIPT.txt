@@ -1,0 +1,181 @@
+version 4.5
+
+class Lazor : Actor
+{
+	SimpleLaser emitter;
+	Actor aimpuff;
+	double dist;
+	
+	Default
+	{	
+		+NOINTERACTION;
+		+INTERPOLATEANGLES;
+		Radius 6;
+	}
+
+	override void Tick() 
+	{
+		if(!emitter || !emitter.laser_on) 
+		{
+			Destroy();
+			return;
+		}
+		// Carefully follow emitter.
+		A_SetAngle(SimpleLaser.Lerp(angle, emitter.angle, 0.5), SPF_INTERPOLATE);
+		A_SetPitch(SimpleLaser.Lerp(pitch, emitter.pitch+90, 0.5), SPF_INTERPOLATE);
+		
+		vector3 posdir = (
+			cos(angle) * cos(pitch-90),
+			sin(angle) * cos(pitch-90),
+			sin(pitch+90)
+		) * emitter.curdist/2.;
+		
+		// Scale to correct size.
+		Scale.Y = emitter.curdist / radius;
+		
+		// Warp to emitter.
+		posdir = level.Vec3Offset(posdir, emitter.pos);		
+		vector3 finalpos = level.Vec3Offset(posdir, vel);
+		SetOrigin(finalpos, true);
+	}
+	
+	States
+	{
+		Spawn:
+			BEAM A 1;
+		loop;
+	}	
+}
+
+class SimpleLaser : Actor
+{
+	Actor source;
+	Actor aimactor;
+	Lazor laser;
+	vector3 aimpos;
+	vector2 viewoffs;
+	vector3 posoffs;
+	bool laser_on;
+	double curdist;
+	
+	Default
+	{
+		+NOINTERACTION;
+		+INTERPOLATEANGLES;
+	}
+
+	// Linear interpolate
+	static double Lerp(double a, double b, double lerpFactor)
+	{
+		double result = (a * (1.f - lerpFactor)) + (b * lerpFactor);
+		return result;
+	}
+	
+	private double GetDist(uint flags, int maxdist = int.max)
+	{
+		FLineTraceData lt;
+		LineTrace(angle, maxdist, pitch, flags,0, source.radius+16,0, lt);
+		aimpos = lt.HitLocation;
+		aimactor = lt.HitActor;
+		return lt.Distance;
+	}
+
+	override void Tick()
+	{
+		if(!source) return;
+		A_SetAngle(source.angle + viewoffs.x, SPF_INTERPOLATE);
+		A_SetPitch(source.pitch + viewoffs.y, SPF_INTERPOLATE);
+		super.Tick();
+	}
+	
+	void SetPos(Vector3 pos, vector3 pos_offset = (0,0,0), vector2 view_offset = (0,0))
+	{
+		viewoffs = view_offset;
+		posoffs = pos_offset;
+		SetOrigin(level.Vec3Offset(pos,pos_offset), false);
+	}
+	
+	static SimpleLaser Attach(Actor to)
+	{
+		let lasersource = SimpleLaser(Spawn("SimpleLaser"));
+		if(lasersource) 
+		{
+			lasersource.source = to;
+			lasersource.SetPos(to.pos);
+		}
+		return lasersource;
+	}
+
+	Lazor Fire(class<Lazor> parts, class<Actor> puff = "", int maxdist = int.max, uint ltflags = 0)
+	{
+		if(!source) return null;
+		curdist = GetDist(ltflags, maxdist);	
+		vel = source.vel;
+		Actor spwnpuff;
+		if(puff)
+		{
+			spwnpuff = Spawn(puff, aimpos);
+			if(spwnpuff) 
+			{
+				spwnpuff.angle = angle;
+				spwnpuff.pitch = pitch;
+			}
+		}
+		if(!laser_on)
+		{
+			let lasobj = Lazor(Actor.Spawn(parts,pos));
+			if(lasobj) 
+			{
+				lasobj.emitter = self;
+				lasobj.angle = angle;
+				lasobj.pitch = pitch+90;
+				lasobj.vel = source.vel;	
+				lasobj.aimpuff = spwnpuff;
+			}
+			laser = lasobj;
+		}
+		laser_on = true;
+		return laser;
+	}
+	
+	void LaserOff()
+	{
+		laser_on = false;
+	}
+}
+
+class TestHandler : EventHandler
+{
+	SimpleLaser laser;
+	override void WorldTick()
+	{
+		// Ideally, this should be placed on a weapon probably, but
+		// for demonstration this is alright.
+		
+		let plr = players[consoleplayer].mo;
+		if(plr)
+		{
+			// First, the laser is attached to the shooter.
+			if(!laser) 
+			{
+				laser = SimpleLaser.Attach(plr);
+				return;
+			}
+			if(plr.player.cmd.buttons & BT_ALTATTACK)
+			{
+				// When the player presses altfire
+				// set the laser position to their current view and fire it.
+				// Fire must be called continually to update the laser properly
+				// whenever you want to switch it off call LaserOff().
+				double zpos = ((-plr.pos.z) + plr.player.viewz) - 16;
+				laser.SetPos(plr.pos, (0,0,zpos));
+				laser.Fire("Lazor"); 
+			} 
+			else
+			{
+				// If the player isn't pressing altfire, disable laser.
+				laser.LaserOff();
+			}
+		}
+	}
+}
