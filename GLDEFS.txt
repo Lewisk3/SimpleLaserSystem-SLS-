@@ -8,7 +8,9 @@ pointlight BlueBrightLight
     size 8
 }
 
+/*
 object Lazor
 {
 	Frame BEAM { light BlueBrightLight }
 }
+*/
