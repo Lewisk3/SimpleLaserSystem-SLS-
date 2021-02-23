@@ -25,6 +25,13 @@ class LaserGlobals abstract
 		double result = (a * (1.f - lerpFactor)) + (b * lerpFactor);
 		return result;
 	}
+	
+	// Offset vector position.
+	static Vector2 VOffset(double fromangle, double forward, double leftright, double distance = 1.)
+	{
+		return ( forward * cos(fromangle) - leftright * sin(fromangle),
+				 leftright * cos(fromangle) + forward * sin(fromangle) )*distance;
+	}
 }
 
 
