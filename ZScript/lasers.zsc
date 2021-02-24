@@ -11,7 +11,7 @@ class RedLaser_Decal : LaserDecal
 		Spawn:
 			LASH A 1 Bright 
 			{
-				A_FadeOut(onactor ? 0.1 : 0.002);
+				A_FadeOut(onactor ? 0.1 : 0.008);
 				if(random(1,60)==60) 
 				{
 					LaserGlobals.SpawnFX(self, "LaserSmoke", frandom(-10,10), -90 + frandom(0,30), frandom(-10,10), -16);
@@ -27,7 +27,7 @@ class RedLaser : Laser
 	{
 		Scale 0.8;
 		RenderStyle "Add";
-		Translation "0:255=@80[128,0,0]";
+		Translation "0:255=@80[32,0,128]"; // 32 0 128
 		Alpha 1.0;
 	}
 	States
@@ -52,7 +52,7 @@ class RedLaser_Puff : LaserPuff
 				DoSmoke(3);
 				DoDecal("RedLaser_Decal");
 				DoParticles(spd:frandom(2,5));
-				DamageHitActor(20);
+				DamageHitActor(10);
 				// A_StartSound("Laser/Impact", flags:CHANF_OVERLAP);
 			}
 		stop;

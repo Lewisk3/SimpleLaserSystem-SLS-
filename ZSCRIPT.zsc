@@ -5,51 +5,73 @@ version 4.5
 #include "ZScript/lasers.zsc"
 
 // Handle Laser Firing (Example)
+class LaserHolder : Inventory
+{
+	Default
+	{
+		Inventory.MaxAmount 1;
+	}
+	
+	LaserEmitter laser_one;
+	LaserEmitter laser_two;
+	override void Tick()
+	{
+		if(Owner)
+		{
+			let plr = PlayerPawn(Owner);
+			if(plr)
+			{
+				// First, the laser is attached to the shooter.
+				if(!laser_one) 
+				{
+					laser_one = LaserEmitter.Attach(plr);
+					laser_two = LaserEmitter.Attach(plr);
+					return;
+				}
+				if(plr.player.cmd.buttons & BT_ALTATTACK)
+				{
+					// When the player presses altfire
+					// set the laser position to their current view and fire it.
+					// Fire must be called continually to update the laser properly
+					// whenever you want to switch it off call LaserOff().
+					double zpos = ((-plr.pos.z) + plr.player.viewz) - 10;
+					vector2 offs = LaserGlobals.VOffset(plr.angle,0,10);
+					laser_one.SetPos(plr.pos, (offs.x,offs.y,zpos));
+					laser_two.SetPos(plr.pos, (-offs.x,-offs.y,zpos));
+					if(!laser_one.laser_on) 
+						plr.A_StartSound("Laser/Fire", CHAN_WEAPON, CHANF_OVERLAP);
+					else
+						plr.A_StartSound("Laser/Fire/Cont", CHAN_WEAPON, CHANF_OVERLAP|CHANF_LOOPING); 
+					laser_one.Fire("RedLaser", "RedLaser_Puff"); 
+					laser_two.Fire("RedLaser", "RedLaser_Puff");
+				} 
+				else
+				{
+					// If the player isn't pressing altfire, disable laser.
+					laser_one.LaserOff();
+					laser_two.LaserOff();
+					plr.A_StopSound(CHAN_WEAPON);
+				}
+			}
+		}
+		super.tick();
+	}
+}
 
 class LaserHandler : EventHandler
 {
-	LaserEmitter laser_one;
-	LaserEmitter laser_two;
+
 	
 	override void WorldTick()
 	{
 		// Ideally, this should be placed on a weapon probably, but
 		// for demonstration this is alright.
-		
-		let plr = players[consoleplayer].mo;
-		if(plr)
+		for(int i = 0; i < MAXPLAYERS; i++)
 		{
-			// First, the laser is attached to the shooter.
-			if(!laser_one) 
-			{
-				laser_one = LaserEmitter.Attach(plr);
-				laser_two = LaserEmitter.Attach(plr);
-				return;
-			}
-			if(plr.player.cmd.buttons & BT_ALTATTACK)
-			{
-				// When the player presses altfire
-				// set the laser position to their current view and fire it.
-				// Fire must be called continually to update the laser properly
-				// whenever you want to switch it off call LaserOff().
-				double zpos = ((-plr.pos.z) + plr.player.viewz) - 10;
-				vector2 offs = LaserGlobals.VOffset(plr.angle,0,10);
-				laser_one.SetPos(plr.pos, (offs.x,offs.y,zpos));
-				laser_two.SetPos(plr.pos, (-offs.x,-offs.y,zpos));
-				if(!laser_one.laser_on) 
-					plr.A_StartSound("Laser/Fire", CHAN_WEAPON, CHANF_OVERLAP);
-				else
-					plr.A_StartSound("Laser/Fire/Cont", CHAN_WEAPON, CHANF_OVERLAP|CHANF_LOOPING); 
-				laser_one.Fire("RedLaser", "RedLaser_Puff"); 
-				laser_two.Fire("RedLaser", "RedLaser_Puff");
-			} 
-			else
-			{
-				// If the player isn't pressing altfire, disable laser.
-				laser_one.LaserOff();
-				laser_two.LaserOff();
-				plr.A_StopSound(CHAN_WEAPON);
-			}
+			if(!PlayerInGame[i]) continue;
+			let plr = players[i].mo;
+			if(plr && !plr.FindInventory("LaserHolder"))
+				plr.GiveInventory("LaserHolder", 1);
 		}
 	}
 }

@@ -8,7 +8,7 @@ material texture sprites/LASHA0.png {
 
 pointlight RedBrightLight
 {
-    color 1.0 0.0 0.0
+    color 0.5 0 0.5 // 0.5 0 0.5
     size 12
 }
 

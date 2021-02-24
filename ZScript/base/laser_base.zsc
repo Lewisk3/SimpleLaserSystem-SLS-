@@ -32,6 +32,22 @@ class LaserGlobals abstract
 		return ( forward * cos(fromangle) - leftright * sin(fromangle),
 				 leftright * cos(fromangle) + forward * sin(fromangle) )*distance;
 	}
+	
+	// Linear interpolate 3D vectors
+	static vector3 Lerp3D(vector3 a, vector3 b, double lerpfactor)
+	{
+		vector3 result = a;
+		result.x = Lerp(result.x,b.x,lerpfactor);
+		result.y = Lerp(result.y,b.y,lerpfactor);
+		result.z = Lerp(result.z,b.z,lerpfactor);
+		return result;
+	}
+	
+	// Distance 3D on vectors, not actors. (Precise version)
+	static double Distance3D(vector3 one, vector3 two)
+	{
+		return sqrt( (two.x - one.x)**2 + (two.y - one.y)**2 + (two.z - one.z)**2 );
+	}
 }
 
 
@@ -42,7 +58,7 @@ class LaserEmitter : Actor
 	Actor aimactor;
 	Laser activelaser;
 	vector3 aimpos;
-	vector2 viewoffs, pview, viewvel;
+	vector2 viewoffs, viewvel;
 	vector3 posoffs;
 	bool laser_on;
 	double curdist;
@@ -68,10 +84,12 @@ class LaserEmitter : Actor
 	override void Tick()
 	{
 		if(!source) return;
-		viewvel = (source.angle - pview.x, source.pitch - pview.y);
-		A_SetAngle(source.angle + viewoffs.x, SPF_INTERPOLATE);
-		A_SetPitch(source.pitch + viewoffs.y, SPF_INTERPOLATE);
-		pview = (source.angle, source.pitch);
+		
+		double iyaw = source.player.cmd.yaw * (360./65536.);
+		double ipit = -source.player.cmd.pitch * (360./65536.);
+		A_SetAngle(source.player.camera.angle + viewoffs.x, SPF_INTERPOLATE);
+		A_SetPitch(source.player.camera.pitch + viewoffs.y, SPF_INTERPOLATE);
+		viewvel = (iyaw, ipit);
 		super.Tick();
 	}
 	
@@ -93,11 +111,11 @@ class LaserEmitter : Actor
 		return lasersource;
 	}
 
-	Laser Fire(class<Laser> parts, class<Actor> puff = "", int maxdist = int.max, uint ltflags = 0, bool predict = false)
+	Laser Fire(class<Laser> parts, class<Actor> puff = "", int maxdist = int.max, uint ltflags = 0, bool predict = true)
 	{
 		if(!source) return null;
 		curdist = GetDist(ltflags, maxdist);	
-		vel = source.vel;
+		//vel.xy = source.vel.xy;
 		Actor spwnpuff;
 		if(puff)
 		{
@@ -155,24 +173,29 @@ class Laser : Actor
 			return;
 		}
 		// Carefully follow emitter.
+		bool localplr = (players[consoleplayer] == emitter.source.player);
 		vector2 paim = (0,0);
 		if(predictaim) paim = emitter.viewvel;
-		A_SetAngle(LaserGlobals.Lerp(angle, emitter.angle + paim.x, 0.5), SPF_INTERPOLATE);
-		A_SetPitch(LaserGlobals.Lerp(pitch, emitter.pitch+90 + paim.y, 0.5), SPF_INTERPOLATE);
+		vector2 toangles = (emitter.angle + paim.x, emitter.pitch+90 + paim.y);
 		
+		A_SetAngle(LaserGlobals.Lerp(angle, toangles.x, 0.5), SPF_INTERPOLATE);
+		A_SetPitch(LaserGlobals.Lerp(pitch, toangles.y, 0.5), SPF_INTERPOLATE);
+		
+		double cosp = cos(pitch-90);
+		double dist_desired = emitter.curdist/2.;
 		vector3 posdir = (
-			cos(angle) * cos(pitch-90),
-			sin(angle) * cos(pitch-90),
+			cos(angle) * cosp,
+			sin(angle) * cosp,
 			sin(pitch+90)
-		) * emitter.curdist/2.;
-		
+		) * (localplr ? 1 : dist_desired); 
+
 		// Scale to correct size.
-		double newscale = default.scale.x * (emitter.curdist / (radius*default.scale.x));
-		Scale.Y = newscale < Scale.Y ? LaserGlobals.Lerp(Scale.Y, newscale, 0.1) : newscale;
+		double scalequanta = (double(radius)*default.scale.x) * (localplr ? 0.5 : 1.0);
+		double newscale = default.scale.x * (emitter.curdist / scalequanta);
+		Scale.Y = newscale;
 		
 		// Warp to emitter.
 		posdir = level.Vec3Offset(posdir, emitter.pos);		
-		vector3 finalpos = level.Vec3Offset(posdir, vel);
-		SetOrigin(finalpos, true);
+		SetOrigin(posdir, true);
 	}
 }
