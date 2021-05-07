@@ -35,9 +35,9 @@ class LaserHolder : Inventory
 					// Fire must be called continually to update the laser properly
 					// whenever you want to switch it off call LaserOff().
 					double zpos = ((-plr.pos.z) + plr.player.viewz) - 10;
-					vector2 offs = LaserGlobals.VOffset(plr.angle,0,10);
+					vector2 offs = (50,10);
 					laser_one.SetPos(plr.pos, (offs.x,offs.y,zpos));
-					laser_two.SetPos(plr.pos, (-offs.x,-offs.y,zpos));
+					laser_two.SetPos(plr.pos, (offs.x,-offs.y,zpos));
 					if(!laser_one.laser_on) 
 						plr.A_StartSound("Laser/Fire", CHAN_WEAPON, CHANF_OVERLAP);
 					else
@@ -60,8 +60,6 @@ class LaserHolder : Inventory
 
 class LaserHandler : EventHandler
 {
-
-	
 	override void WorldTick()
 	{
 		// Ideally, this should be placed on a weapon probably, but

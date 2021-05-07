@@ -33,6 +33,22 @@ class LaserGlobals abstract
 				 leftright * cos(fromangle) + forward * sin(fromangle) )*distance;
 	}
 	
+	// 3D Vector offset, thanks Comet!
+	static vector3 V3Offset(double fromangle, double frompitch, double forward, double leftright, double updown, double distance)
+    {
+		double cosa = cos(fromangle), sina = sin(fromangle); 
+		double cosp = cos(frompitch), sinp = sin(frompitch);
+		leftright *= -1;
+		
+		vector3 vec;
+		vec.x = forward * cosa * cosp - leftright * sina + updown * cosa * sinp;
+		vec.y = forward * sina * cosp + leftright * cosa + updown * sina * sinp;
+		vec.z = -forward * sinp + updown * cosp;
+		vec *= distance;
+		
+		return vec;
+    }
+	
 	// Linear interpolate 3D vectors
 	static vector3 Lerp3D(vector3 a, vector3 b, double lerpfactor)
 	{
@@ -85,19 +101,30 @@ class LaserEmitter : Actor
 	{
 		if(!source) return;
 		
-		double iyaw = source.player.cmd.yaw * (360./65536.);
-		double ipit = -source.player.cmd.pitch * (360./65536.);
-		A_SetAngle(source.player.camera.angle + viewoffs.x, SPF_INTERPOLATE);
-		A_SetPitch(source.player.camera.pitch + viewoffs.y, SPF_INTERPOLATE);
-		viewvel = (iyaw, ipit);
+		if(source.player)
+		{
+			double iyaw = source.player.cmd.yaw * (360./65536.);
+			double ipit = -source.player.cmd.pitch * (360./65536.);
+			viewvel = (iyaw, ipit);
+		}
+		
+		A_SetAngle(source.angle + viewoffs.x, SPF_INTERPOLATE);
+		A_SetPitch(source.pitch + viewoffs.y, SPF_INTERPOLATE);
 		super.Tick();
+	}
+	
+	vector3 UpdatePos()
+	{
+		SetPos(source.pos, posoffs, viewoffs);
+		return pos;
 	}
 	
 	void SetPos(Vector3 pos, vector3 pos_offset = (0,0,0), vector2 view_offset = (0,0))
 	{
 		viewoffs = view_offset;
 		posoffs = pos_offset;
-		SetOrigin(level.Vec3Offset(pos,pos_offset), false);
+		vector3 finalpos = LaserGlobals.V3Offset(source.angle+viewoffs.x, source.pitch+viewoffs.y, pos_offset.x, pos_offset.y, pos_offset.z, 1.);
+		SetOrigin(level.Vec3Offset(pos,finalpos), false);
 	}
 	
 	static LaserEmitter Attach(Actor to)
@@ -173,7 +200,10 @@ class Laser : Actor
 			return;
 		}
 		// Carefully follow emitter.
-		bool localplr = (players[consoleplayer] == emitter.source.player);
+		bool localplr = true;
+		if(emitter.source.player)
+			localplr = (players[consoleplayer] == emitter.source.player);
+			
 		vector2 paim = (0,0);
 		if(predictaim) paim = emitter.viewvel;
 		vector2 toangles = (emitter.angle + paim.x, emitter.pitch+90 + paim.y);
@@ -195,7 +225,7 @@ class Laser : Actor
 		Scale.Y = newscale;
 		
 		// Warp to emitter.
-		posdir = level.Vec3Offset(posdir, emitter.pos);		
+		posdir = level.Vec3Offset(posdir, emitter.UpdatePos());		
 		SetOrigin(posdir, true);
 	}
 }

@@ -27,7 +27,7 @@ class RedLaser : Laser
 	{
 		Scale 0.8;
 		RenderStyle "Add";
-		Translation "0:255=@80[32,0,128]"; // 32 0 128
+		Translation "0:255=@80[128,0,16]"; // 32 0 128
 		Alpha 1.0;
 	}
 	States
